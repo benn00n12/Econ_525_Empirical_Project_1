@@ -5,23 +5,46 @@ format: html
 editor: visual
 ---
 
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+## Load Library and Data
 
 ```{r}
-1 + 1
+library(pacman)
+p_load(tidyverse, stargazer, data.table, tidyfast, dtplyr, haven)
+
+ohp = read_dta("ohp.dta")
+ohp_dt <- as.data.table(ohp)
 ```
 
-You can add options to executable code like this
+# Questions
+
+### Q1
+
+Explain the difference between the variables treatment and ohp_all_ever_survey. Explain\
+why treatment is the treatment variable (Di), rather than ohp_all_ever_survey.
+
+Treatment is when someone either won the OHP lottery or did not win the lottery (1, 0).
+
+ohp_all_ever_survey is if the person was every enrolled into medicaid.
+
+Treatment is the variable we want because we are looking to see if increased access to medicaid improves health outcomes. ohp_all_ever_survey is independent of the research question and gives us a look at the compliance rate.
+
+### Q2
+
+Provide evidence that the OHP lottery really did randomly assign individuals to treatment\
+and control groups. Similar to Table 1 in Taubman et al. (2014), please create a nicely\
+formatted table that reports means of 4 to 6 relevant characteristics for individuals in the\
+control group
 
 ```{r}
-#| echo: false
-2 * 2
-```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+edu <- lm(data = ohp_dt, edu_inp ~ treatment)
+age <- lm(data = ohp_dt, age_inp ~ treatment)
+med_ever <- lm(data = ohp_dt, ohp_all_ever_survey ~ treatment)
+black <- lm(data = ohp_dt, race_black_inp~treatment)
+white <- lm(data = ohp_dt, race_white_inp~treatment)
+other <- lm(data = ohp_dt, race_nwother_inp~treatment)
+dep <- lm(data = ohp_dt, dep_dx_pre_lottery ~ treatment)
+dia <- lm(data = ohp_dt, dia_dx_pre_lottery ~ treatment)
+
+stargazer(edu, age, med_ever, black, white, other, dep, dia, type="html")
+```
