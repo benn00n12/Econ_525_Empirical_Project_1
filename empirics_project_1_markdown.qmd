@@ -1,7 +1,7 @@
 ---
 title: "Empirical Project 1"
 author: "Ben Noon"
-format: html
+format: pdf
 editor: visual
 ---
 
@@ -9,10 +9,12 @@ editor: visual
 
 ```{r}
 library(pacman)
-p_load(tidyverse, stargazer, data.table, tidyfast, dtplyr, haven)
+p_load(tidyverse, stargazer, data.table, tidyfast, dtplyr, haven, modelsummary,collapse)
 
 ohp = read_dta("ohp.dta")
+ohp[] = lapply(ohp, as.numeric)
 ohp_dt <- as.data.table(ohp)
+
 ```
 
 # Questions
@@ -36,15 +38,114 @@ formatted table that reports means of 4 to 6 relevant characteristics for indivi
 control group
 
 ```{r}
+ohp_cntrl <- subset(ohp_dt, treatment ==0, select =
+c(age_inp, race_black_inp, race_white_inp, race_nwother_inp, gender_inp, edu_inp))
 
-edu <- lm(data = ohp_dt, edu_inp ~ treatment)
+summary(ohp_cntrl)
+```
+
+### Q3
+
+For each of the variables you summarized above, calculate:\
+(i) the difference between the mean in the treatment group and the mean in the control\
+group;2\
+(ii) the standard error for the difference in means.\
+
+```{r}
 age <- lm(data = ohp_dt, age_inp ~ treatment)
-med_ever <- lm(data = ohp_dt, ohp_all_ever_survey ~ treatment)
+edu <- lm(data = ohp_dt, edu_inp ~ treatment)
 black <- lm(data = ohp_dt, race_black_inp~treatment)
 white <- lm(data = ohp_dt, race_white_inp~treatment)
 other <- lm(data = ohp_dt, race_nwother_inp~treatment)
-dep <- lm(data = ohp_dt, dep_dx_pre_lottery ~ treatment)
-dia <- lm(data = ohp_dt, dia_dx_pre_lottery ~ treatment)
+gen <- lm(data = ohp_dt, gender_inp ~ treatment)
 
-stargazer(edu, age, med_ever, black, white, other, dep, dia, type="html")
+
+msummary(list(edu, age, white, black, other, gen), stars = TRUE, title = "Balance Check")
+
+
 ```
+
+Instead of adding the coefficients and standard errors to my earlier graph, I used the modelsummary package to created a better looking graph that contains all the information. The intercept is the mean of the control group for each variable.
+
+### Q4
+
+Is the balance table consistent with individuals having been randomly assigned to treatment\
+group and control groups? Why or why not?
+
+I would argue that the balance table shows individuals were randomly assigned to treatment and control groups. None of the coefficients are statistically significant which would indicate one control variable was different from the control.
+
+### Q5
+
+Estimate the compliance rate for the OHP experiment. That is, what is the effect of being\
+assigned to the treatment group on the probability of being enrolled in Medicaid?
+
+```{r}
+
+mod1 = lm(ohp_all_ever_survey~ treatment + age_inp + edu_inp + race_black_inp + race_white_inp + gender_inp, ohp)
+
+msummary(mod1, vcov = "HC1")
+```
+
+The intercept is at 15.8% and the coefficient is at 25.4%. Averaging these two numbers show the over all compliance rate of \~20.6%.
+
+### Q6
+
+What is the intent-to-treat (ITT) effect of the OHP experiment on health outcomes? Please\
+create a nicely formatted table that reports ITT estimates on 4 to 6 relevant health outcomes.\
+Again, part of this question is to get you to think about which 4 to 6 variables could be used\
+as health outcome variables.
+
+```{r}
+models = list(
+"Depression" = lm(dep_dx_post_lottery ~ treatment + age_inp + edu_inp + race_black_inp + race_white_inp + gender_inp, data = ohp),
+"Diabetes" = lm(dia_dx_post_lottery ~ treatment + age_inp + edu_inp + race_black_inp + race_white_inp + gender_inp, data = ohp),
+"Hypertension" = lm(hbp_dx_post_lottery ~ treatment + age_inp + edu_inp + race_black_inp + race_white_inp + gender_inp, data = ohp),
+"Perscription Num" = lm(rx_num_mod_inp ~ treatment + age_inp + edu_inp + race_black_inp + race_white_inp + gender_inp, data = ohp)
+)
+
+
+msummary(models, stars = TRUE, title = "List of Models")
+```
+
+### Q7
+
+What is the "treatment on the treated" effect (ATET) of the OHP experiment, i.e. the effect\
+among those who applied for Medicaid? Estimate it for every health outcome you chose\
+in question 6 and provide some intuition for the calculation of this estimate.
+
+```{r}
+
+atet_dep= lm(dep_dx_post_lottery ~ treatment + age_inp + edu_inp + race_black_inp + race_white_inp + gender_inp,data = ohp)
+  
+atet_dia = lm(dia_dx_post_lottery ~ treatment + age_inp + edu_inp + race_black_inp + race_white_inp + gender_inp, data = ohp)
+  
+atet_hyp = lm(hbp_dx_post_lottery ~ treatment + age_inp + edu_inp + race_black_inp + race_white_inp + gender_inp, data = ohp)
+  
+atet_rx = lm(rx_num_mod_inp ~ treatment + age_inp + edu_inp + race_black_inp + race_white_inp + gender_inp, data = ohp)
+
+
+models2 = list(
+  "ATET Depression" = atet_dep$coefficients[2]/mod1$coefficients[2],
+  "ATET Diabetes" = atet_dia$coefficients[2]/mod1$coefficients[2],
+  "ATET Hypertension" = atet_hyp$coefficients[2]/mod1$coefficients[2],
+  "ATET Perscription Number" = atet_rx$coefficients[2]/mod1$coefficients[2]
+)
+
+models2
+```
+
+The intent to treat coefficients for depression, diabetes, hypertension, and prescription number are 0.005, 0.008, 0.002, and 0.111. I take the compliance rate of 0.25The ATET effects are 0.0195, 0.0322, 0.0084, and 0.4327.
+
+### Q8
+
+Do you have to worry about attrition bias in analyzing this data? Explain why or why not.
+
+I am worried about attrition bias. Since attrition bias is where individuals non-randomly break from treatment or control guidelines, my guess would be that people of certain income strata would break more than other people from a different income strata. Someone of middle class is more likely to commit attrition in the treatment group over the control group.
+
+### Q9
+
+Suppose that you are submitting these results to a general interest journal such as Science\
+for publication. Write an abstract of 200 or fewer words describing what you have found\
+in your analysis of the OHP data, similar to the abstract in Taubman et al. (2014).
+
+Public health spending is an intensely debated topic within the United States. Data from the Oregon Health Insurance experiment was gathered to see if there is a noticeable increase in health outcomes. There are varying degrees of success in improving health outcomes for those who were given access to Medicaid, but due to some missing information, attrition bias cannot be ruled out.
